@@ -113,7 +113,7 @@ def test_plot(test_id: int, limit: int = 5000):
         "voltage": [r[1] for r in rows],
         "current": [r[2] for r in rows],
         "capacity": [r[3] for r in rows],
-        "energy": [r[4] for r in rows]
+        "energy": [r[4] for r in rows],
     }
 
 
