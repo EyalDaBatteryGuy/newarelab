@@ -2,7 +2,9 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
 import psycopg2
+import os
 
 app = FastAPI()
 
@@ -16,14 +18,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-import os
-from urllib.parse import urlparse
-
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-url = urlparse(DATABASE_URL)
-
-DATABASE_URL = os.getenv("DATABASE_URL")
+conn = psycopg2.connect(DATABASE_URL)
 
 @app.get("/")
 def root():
