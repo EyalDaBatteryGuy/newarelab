@@ -97,7 +97,7 @@ def test_plot(test_id: int, limit: int = 5000):
                current_a,
                capacity_ah,
                energy_wh
-        FROM records
+        FROM records_plain
         WHERE test_id = %s
         ORDER BY time
         LIMIT %s
@@ -126,7 +126,7 @@ def build_segments(test_id: int):
                voltage_v,
                current_a,
                capacity_ah
-        FROM records
+        FROM records_plain
         WHERE test_id = %s
         ORDER BY time
     """, (test_id,))
