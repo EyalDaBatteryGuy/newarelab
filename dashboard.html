@@ -182,9 +182,40 @@ button:hover {
 <div class="panel">
     <div class="controls-grid">
         <div class="control">
-            Test ID
-            <input id="testId" value="1">
-        </div>
+    Search Cell Name
+    <input id="cellNameSearch" placeholder="Cell Name">
+</div>
+
+<div class="control">
+    Cycler
+    <input id="cyclerInput" placeholder="122">
+</div>
+
+<div class="control">
+    Module
+    <input id="moduleInput" placeholder="1">
+</div>
+
+<div class="control">
+    Channel
+    <input id="channelInput" placeholder="1">
+</div>
+
+<div class="control">
+    <button onclick="searchCell()">Find Cell</button>
+</div>
+
+<div class="control">
+    Test List
+    <select id="testSelector" onchange="loadSelectedTest()">
+        <option value="">Select Test</option>
+    </select>
+</div>
+
+<div class="control">
+    Test ID
+    <input id="testId" value="1">
+</div>
 
         <div class="control">
             Max Raw Data Points
@@ -291,6 +322,72 @@ button:hover {
 <script>
 let latestCycleData = [];
 let latestPlotData = null;
+async function searchCell() {
+
+    const cellName = document.getElementById("cellNameSearch").value;
+    const cycler = document.getElementById("cyclerInput").value;
+    const module = document.getElementById("moduleInput").value;
+    const channel = document.getElementById("channelInput").value;
+
+    const response = await fetch("/tests");
+    const tests = await response.json();
+
+    let filtered = tests;
+
+    if (cellName) {
+        filtered = tests.filter(t =>
+            (t.cell_name || t.test_name || "")
+                .toLowerCase()
+                .includes(cellName.toLowerCase())
+        );
+    }
+
+    if (cycler) {
+        filtered = filtered.filter(t =>
+            String(t.cycler_number || "") === cycler
+        );
+    }
+
+    if (module) {
+        filtered = filtered.filter(t =>
+            String(t.module_number || "") === module
+        );
+    }
+
+    if (channel) {
+        filtered = filtered.filter(t =>
+            String(t.channel_number || "") === channel
+        );
+    }
+
+    const selector = document.getElementById("testSelector");
+    selector.innerHTML = "";
+
+    filtered.forEach(t => {
+
+        const option = document.createElement("option");
+
+        option.value = t.id;
+
+        option.textContent =
+            `ID ${t.id} | ${t.cell_name || t.test_name || ""}`;
+
+        selector.appendChild(option);
+    });
+
+    if (filtered.length > 0) {
+        document.getElementById("testId").value = filtered[0].id;
+    }
+}
+
+function loadSelectedTest() {
+
+    const selector =
+        document.getElementById("testSelector");
+
+    document.getElementById("testId").value =
+        selector.value;
+}
 
 function isGraphSelected(chartId) {
     const checkbox = document.querySelector(`.graphCheck[value="${chartId}"]`);
