@@ -20,8 +20,10 @@ app.add_middleware(
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
+
 def get_conn():
     return psycopg2.connect(DATABASE_URL)
+
 
 @app.get("/")
 def root():
@@ -31,32 +33,48 @@ def root():
 @app.get("/tests")
 def tests():
     conn = get_conn()
-cur = conn.cursor()
+    cur = conn.cursor()
+
     cur.execute("""
         SELECT t.id, t.test_name, e.name
         FROM tests t
-        JOIN experiments e ON t.experiment_id = e.id
+        LEFT JOIN experiments e ON t.experiment_id = e.id
         ORDER BY t.id
     """)
+
     rows = cur.fetchall()
 
+    cur.close()
+    conn.close()
+
     return [
-        {"id": r[0], "test_name": r[1], "experiment": r[2]}
+        {
+            "id": r[0],
+            "test_name": r[1],
+            "experiment": r[2]
+        }
         for r in rows
     ]
 
 
 @app.get("/test/{test_id}/cycles")
 def test_cycles(test_id: int):
-   conn = get_conn()
-cur = conn.cursor()
+    conn = get_conn()
+    cur = conn.cursor()
+
     cur.execute("""
-        SELECT cycle_index, charge_capacity_ah, discharge_capacity_ah
+        SELECT cycle_index,
+               charge_capacity_ah,
+               discharge_capacity_ah
         FROM cycles
         WHERE test_id = %s
         ORDER BY cycle_index
     """, (test_id,))
+
     rows = cur.fetchall()
+
+    cur.close()
+    conn.close()
 
     return [
         {
@@ -71,52 +89,77 @@ cur = conn.cursor()
 @app.get("/test/{test_id}/plot")
 def test_plot(test_id: int, limit: int = 5000):
     conn = get_conn()
-cur = conn.cursor()
+    cur = conn.cursor()
+
     cur.execute("""
-        SELECT time, voltage_v, current_a, capacity_ah, energy_wh
+        SELECT time,
+               voltage_v,
+               current_a,
+               capacity_ah,
+               energy_wh
         FROM records
         WHERE test_id = %s
         ORDER BY time
         LIMIT %s
     """, (test_id, limit))
+
     rows = cur.fetchall()
+
+    cur.close()
+    conn.close()
 
     return {
         "time": [str(r[0]) for r in rows],
         "voltage": [r[1] for r in rows],
         "current": [r[2] for r in rows],
         "capacity": [r[3] for r in rows],
-        "energy": [r[4] for r in rows],
+        "energy": [r[4] for r in rows]
     }
 
 
 def build_segments(test_id: int):
     conn = get_conn()
-cur = conn.cursor()
+    cur = conn.cursor()
+
     cur.execute("""
-        SELECT time, voltage_v, current_a, capacity_ah
+        SELECT time,
+               voltage_v,
+               current_a,
+               capacity_ah
         FROM records
         WHERE test_id = %s
         ORDER BY time
     """, (test_id,))
+
     rows = cur.fetchall()
+
+    cur.close()
+    conn.close()
 
     segments = []
     current_segment = []
+
     last_capacity = None
     last_sign = None
 
     for time, voltage, current, capacity in rows:
+
         if current is None or capacity is None:
             continue
 
         sign = 1 if current > 0 else -1 if current < 0 else 0
+
         new_segment = False
 
         if last_capacity is not None and capacity < last_capacity:
             new_segment = True
 
-        if last_sign is not None and sign != 0 and last_sign != 0 and sign != last_sign:
+        if (
+            last_sign is not None
+            and sign != 0
+            and last_sign != 0
+            and sign != last_sign
+        ):
             new_segment = True
 
         if new_segment and current_segment:
@@ -131,6 +174,7 @@ cur = conn.cursor()
         })
 
         last_capacity = capacity
+
         if sign != 0:
             last_sign = sign
 
@@ -142,9 +186,11 @@ cur = conn.cursor()
 
 @app.get("/test/{test_id}/virtual_cycle/{cycle_number}")
 def virtual_cycle(test_id: int, cycle_number: int):
+
     segments = build_segments(test_id)
 
     cycle_index = cycle_number - 1
+
     charge_i = cycle_index * 2
     discharge_i = charge_i + 1
 
@@ -157,13 +203,16 @@ def virtual_cycle(test_id: int, cycle_number: int):
 
 @app.get("/test/{test_id}/voltage_fade")
 def voltage_fade(test_id: int):
+
     segments = build_segments(test_id)
 
     cycles = []
     avg_voltage = []
 
     cycle_number = 1
+
     for i in range(1, len(segments), 2):
+
         discharge = segments[i]
 
         voltages = [
@@ -182,6 +231,7 @@ def voltage_fade(test_id: int):
         "cycle": cycles,
         "avg_voltage": avg_voltage
     }
+
 
 @app.get("/dashboard")
 def dashboard():
