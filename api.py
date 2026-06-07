@@ -20,7 +20,8 @@ app.add_middleware(
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-conn = psycopg2.connect(DATABASE_URL)
+def get_conn():
+    return psycopg2.connect(DATABASE_URL)
 
 @app.get("/")
 def root():
@@ -29,7 +30,8 @@ def root():
 
 @app.get("/tests")
 def tests():
-    cur = conn.cursor()
+    conn = get_conn()
+cur = conn.cursor()
     cur.execute("""
         SELECT t.id, t.test_name, e.name
         FROM tests t
@@ -46,7 +48,8 @@ def tests():
 
 @app.get("/test/{test_id}/cycles")
 def test_cycles(test_id: int):
-    cur = conn.cursor()
+   conn = get_conn()
+cur = conn.cursor()
     cur.execute("""
         SELECT cycle_index, charge_capacity_ah, discharge_capacity_ah
         FROM cycles
@@ -67,7 +70,8 @@ def test_cycles(test_id: int):
 
 @app.get("/test/{test_id}/plot")
 def test_plot(test_id: int, limit: int = 5000):
-    cur = conn.cursor()
+    conn = get_conn()
+cur = conn.cursor()
     cur.execute("""
         SELECT time, voltage_v, current_a, capacity_ah, energy_wh
         FROM records
@@ -87,7 +91,8 @@ def test_plot(test_id: int, limit: int = 5000):
 
 
 def build_segments(test_id: int):
-    cur = conn.cursor()
+    conn = get_conn()
+cur = conn.cursor()
     cur.execute("""
         SELECT time, voltage_v, current_a, capacity_ah
         FROM records
