@@ -482,11 +482,15 @@ async function loadData() {
         plotData = await plotResponse.json();
         latestPlotData = plotData;
     }
+console.log("PLOT DATA");
+console.log(plotData);
 
     if (needVoltageFade) {
         const fadeResponse = await fetch(`/test/${testId}/voltage_fade`);
         fadeData = await fadeResponse.json();
     }
+console.log("FADE DATA");
+console.log(fadeData);
 
     if (isGraphSelected("specCapacityChart")) {
         showChart("specCapacityChart");

@@ -236,3 +236,71 @@ def voltage_fade(test_id: int):
 @app.get("/dashboard")
 def dashboard():
     return FileResponse("/app/dashboard.html")
+
+@app.get("/tests/search")
+def search_tests(
+    cell_name: str | None = None,
+    cycler: int | None = None,
+    module: int | None = None,
+    channel: int | None = None,
+):
+    conn = get_conn()
+    cur = conn.cursor()
+
+    if cell_name:
+        cur.execute("""
+            SELECT id, test_name, cell_name, cycler_number, module_number, channel_number
+            FROM tests
+            WHERE LOWER(cell_name) LIKE LOWER(%s)
+            LIMIT 20
+        """, (f"%{cell_name}%",))
+
+    else:
+        cur.execute("""
+            SELECT id, test_name, cell_name, cycler_number, module_number, channel_number
+            FROM tests
+            WHERE cycler_number = %s
+              AND module_number = %s
+              AND channel_number = %s
+            LIMIT 20
+        """, (cycler, module, channel))
+
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    return [
+        {
+            "id": r[0],
+            "test_name": r[1],
+            "cell_name": r[2],
+            "cycler_number": r[3],
+            "module_number": r[4],
+            "channel_number": r[5],
+        }
+        for r in rows
+    ]
+
+@app.get("/tests")
+def get_tests():
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT id, test_name
+        FROM tests
+        ORDER BY id DESC
+    """)
+
+    rows = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    return [
+        {
+            "id": r[0],
+            "test_name": r[1]
+        }
+        for r in rows
+    ]
