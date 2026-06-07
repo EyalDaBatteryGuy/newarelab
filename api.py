@@ -23,13 +23,7 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 
 url = urlparse(DATABASE_URL)
 
-conn = psycopg2.connect(
-    host=url.hostname,
-    port=url.port,
-    database=url.path[1:],
-    user=url.username,
-    password=url.password
-)
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 @app.get("/")
 def root():
