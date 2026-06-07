@@ -304,3 +304,70 @@ def get_tests():
         }
         for r in rows
     ]
+
+@app.get("/tests")
+def get_tests():
+
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT
+            id,
+            test_name,
+            cell_name,
+            cycler_number,
+            module_number,
+            channel_number
+        FROM tests
+        ORDER BY id DESC
+    """)
+
+    rows = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    return [
+        {
+            "id": r[0],
+            "test_name": r[1],
+            "cell_name": r[2],
+            "cycler_number": r[3],
+            "module_number": r[4],
+            "channel_number": r[5]
+        }
+        for r in rows
+    ]
+
+@app.get("/tests")
+def tests():
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT
+            id,
+            test_name,
+            device_id,
+            module_no,
+            channel_no
+        FROM tests
+        ORDER BY id DESC
+    """)
+
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    return [
+        {
+            "id": r[0],
+            "test_name": r[1],
+            "cell_name": r[1],
+            "cycler_number": r[2],
+            "module_number": r[3],
+            "channel_number": r[4]
+        }
+        for r in rows
+    ]
