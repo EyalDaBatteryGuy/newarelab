@@ -30,16 +30,25 @@ def root():
     return {"status": "ok"}
 
 
+@app.get("/dashboard")
+def dashboard():
+    return FileResponse("/app/dashboard.html")
+
+
 @app.get("/tests")
 def tests():
     conn = get_conn()
     cur = conn.cursor()
 
     cur.execute("""
-        SELECT t.id, t.test_name, e.name
-        FROM tests t
-        LEFT JOIN experiments e ON t.experiment_id = e.id
-        ORDER BY t.id
+        SELECT
+            id,
+            test_name,
+            device_id,
+            module_no,
+            channel_no
+        FROM tests
+        ORDER BY id DESC
     """)
 
     rows = cur.fetchall()
@@ -51,7 +60,68 @@ def tests():
         {
             "id": r[0],
             "test_name": r[1],
-            "experiment": r[2]
+            "cell_name": r[1],
+            "cycler_number": r[2],
+            "module_number": r[3],
+            "channel_number": r[4]
+        }
+        for r in rows
+    ]
+
+
+@app.get("/tests/search")
+def search_tests(
+    cell_name: str | None = None,
+    cycler: int | None = None,
+    module: int | None = None,
+    channel: int | None = None,
+):
+    conn = get_conn()
+    cur = conn.cursor()
+
+    if cell_name:
+        cur.execute("""
+            SELECT
+                id,
+                test_name,
+                device_id,
+                module_no,
+                channel_no
+            FROM tests
+            WHERE LOWER(test_name) LIKE LOWER(%s)
+            ORDER BY id DESC
+            LIMIT 50
+        """, (f"%{cell_name}%",))
+
+    else:
+        cur.execute("""
+            SELECT
+                id,
+                test_name,
+                device_id,
+                module_no,
+                channel_no
+            FROM tests
+            WHERE device_id = %s
+              AND module_no = %s
+              AND channel_no = %s
+            ORDER BY id DESC
+            LIMIT 50
+        """, (cycler, module, channel))
+
+    rows = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    return [
+        {
+            "id": r[0],
+            "test_name": r[1],
+            "cell_name": r[1],
+            "cycler_number": r[2],
+            "module_number": r[3],
+            "channel_number": r[4]
         }
         for r in rows
     ]
@@ -63,9 +133,10 @@ def test_cycles(test_id: int):
     cur = conn.cursor()
 
     cur.execute("""
-        SELECT cycle_index,
-               charge_capacity_ah,
-               discharge_capacity_ah
+        SELECT
+            cycle_index,
+            charge_capacity_ah,
+            discharge_capacity_ah
         FROM cycles
         WHERE test_id = %s
         ORDER BY cycle_index
@@ -92,11 +163,12 @@ def test_plot(test_id: int, limit: int = 5000):
     cur = conn.cursor()
 
     cur.execute("""
-        SELECT time,
-               voltage_v,
-               current_a,
-               capacity_ah,
-               energy_wh
+        SELECT
+            time,
+            voltage_v,
+            current_a,
+            capacity_ah,
+            energy_wh
         FROM records_plain
         WHERE test_id = %s
         ORDER BY time
@@ -122,10 +194,11 @@ def build_segments(test_id: int):
     cur = conn.cursor()
 
     cur.execute("""
-        SELECT time,
-               voltage_v,
-               current_a,
-               capacity_ah
+        SELECT
+            time,
+            voltage_v,
+            current_a,
+            capacity_ah
         FROM records_plain
         WHERE test_id = %s
         ORDER BY time
@@ -186,7 +259,6 @@ def build_segments(test_id: int):
 
 @app.get("/test/{test_id}/virtual_cycle/{cycle_number}")
 def virtual_cycle(test_id: int, cycle_number: int):
-
     segments = build_segments(test_id)
 
     cycle_index = cycle_number - 1
@@ -203,7 +275,6 @@ def virtual_cycle(test_id: int, cycle_number: int):
 
 @app.get("/test/{test_id}/voltage_fade")
 def voltage_fade(test_id: int):
-
     segments = build_segments(test_id)
 
     cycles = []
@@ -231,143 +302,3 @@ def voltage_fade(test_id: int):
         "cycle": cycles,
         "avg_voltage": avg_voltage
     }
-
-
-@app.get("/dashboard")
-def dashboard():
-    return FileResponse("/app/dashboard.html")
-
-@app.get("/tests/search")
-def search_tests(
-    cell_name: str | None = None,
-    cycler: int | None = None,
-    module: int | None = None,
-    channel: int | None = None,
-):
-    conn = get_conn()
-    cur = conn.cursor()
-
-    if cell_name:
-        cur.execute("""
-            SELECT id, test_name, cell_name, cycler_number, module_number, channel_number
-            FROM tests
-            WHERE LOWER(cell_name) LIKE LOWER(%s)
-            LIMIT 20
-        """, (f"%{cell_name}%",))
-
-    else:
-        cur.execute("""
-            SELECT id, test_name, cell_name, cycler_number, module_number, channel_number
-            FROM tests
-            WHERE cycler_number = %s
-              AND module_number = %s
-              AND channel_number = %s
-            LIMIT 20
-        """, (cycler, module, channel))
-
-    rows = cur.fetchall()
-    cur.close()
-    conn.close()
-
-    return [
-        {
-            "id": r[0],
-            "test_name": r[1],
-            "cell_name": r[2],
-            "cycler_number": r[3],
-            "module_number": r[4],
-            "channel_number": r[5],
-        }
-        for r in rows
-    ]
-
-@app.get("/tests")
-def get_tests():
-    conn = get_conn()
-    cur = conn.cursor()
-
-    cur.execute("""
-        SELECT id, test_name
-        FROM tests
-        ORDER BY id DESC
-    """)
-
-    rows = cur.fetchall()
-
-    cur.close()
-    conn.close()
-
-    return [
-        {
-            "id": r[0],
-            "test_name": r[1]
-        }
-        for r in rows
-    ]
-
-@app.get("/tests")
-def get_tests():
-
-    conn = get_conn()
-    cur = conn.cursor()
-
-    cur.execute("""
-        SELECT
-            id,
-            test_name,
-            cell_name,
-            cycler_number,
-            module_number,
-            channel_number
-        FROM tests
-        ORDER BY id DESC
-    """)
-
-    rows = cur.fetchall()
-
-    cur.close()
-    conn.close()
-
-    return [
-        {
-            "id": r[0],
-            "test_name": r[1],
-            "cell_name": r[2],
-            "cycler_number": r[3],
-            "module_number": r[4],
-            "channel_number": r[5]
-        }
-        for r in rows
-    ]
-
-@app.get("/tests")
-def tests():
-    conn = get_conn()
-    cur = conn.cursor()
-
-    cur.execute("""
-        SELECT
-            id,
-            test_name,
-            device_id,
-            module_no,
-            channel_no
-        FROM tests
-        ORDER BY id DESC
-    """)
-
-    rows = cur.fetchall()
-    cur.close()
-    conn.close()
-
-    return [
-        {
-            "id": r[0],
-            "test_name": r[1],
-            "cell_name": r[1],
-            "cycler_number": r[2],
-            "module_number": r[3],
-            "channel_number": r[4]
-        }
-        for r in rows
-    ]
