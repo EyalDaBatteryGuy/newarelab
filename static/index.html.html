@@ -163,6 +163,16 @@ button:hover {
     margin-top: 10px;
 }
 
+.search-status {
+    margin-top: 10px;
+    font-size: 14px;
+    color: var(--muted);
+}
+
+.test-selector {
+    min-width: 340px;
+}
+
 .hidden {
     display: none;
 }
@@ -182,33 +192,31 @@ button:hover {
 <div class="panel">
     <div class="controls-grid">
         <div class="control">
-            Search Cell Name
-            <input id="cellNameSearch" placeholder="Cell Name">
+            Search by Cell Name
+            <input id="cellNameSearch" placeholder="Example: Cell A1">
         </div>
 
         <div class="control">
             Cycler
-            <input id="cyclerInput" placeholder="122">
+            <input id="cyclerInput" placeholder="122" value="122">
         </div>
 
         <div class="control">
             Module
-            <input id="moduleInput" placeholder="1">
+            <input id="moduleInput" placeholder="1" value="1">
         </div>
 
         <div class="control">
             Channel
-            <input id="channelInput" placeholder="1">
+            <input id="channelInput" placeholder="1" value="1">
         </div>
 
-        <div class="control">
-            <button onclick="searchCell()">Find Cell</button>
-        </div>
+        <button onclick="searchCell()">Find Cell</button>
 
         <div class="control">
-            Test List
-            <select id="testSelector" onchange="loadSelectedTest()">
-                <option value="">Select Test</option>
+            Select Found Test
+            <select id="testSelector" class="test-selector" onchange="loadSelectedTest()">
+                <option value="">No test selected</option>
             </select>
         </div>
 
@@ -244,7 +252,7 @@ button:hover {
 
     <div class="checkbox-group">
         <b>Show graphs:</b><br>
-        <label><input type="checkbox" class="graphCheck" value="specCapacityChart" onchange="updateVisibleControls()" checked> Specific Capacity</label>
+        <label><input type="checkbox" class="graphCheck" value="specCapacityChart" onchange="updateVisibleControls()"> Specific Capacity</label>
         <label><input type="checkbox" class="graphCheck" value="retentionChart" onchange="updateVisibleControls()"> Retention</label>
         <label><input type="checkbox" class="graphCheck" value="ceChart" onchange="updateVisibleControls()"> CE</label>
         <label><input type="checkbox" class="graphCheck" value="voltageFadeChart" onchange="updateVisibleControls()"> Voltage Fade</label>
@@ -258,24 +266,55 @@ button:hover {
         <b>Cycles for dQ/dV / Voltage-Capacity:</b><br>
         Cycles:
         <input id="cycles" value="1,10,30,60">
+
         <br>
+        <b>Quick cycles:</b><br>
+        <label><input type="checkbox" class="cycleCheck" value="1" checked> 1</label>
+        <label><input type="checkbox" class="cycleCheck" value="2"> 2</label>
+        <label><input type="checkbox" class="cycleCheck" value="5"> 5</label>
+        <label><input type="checkbox" class="cycleCheck" value="10" checked> 10</label>
+        <label><input type="checkbox" class="cycleCheck" value="20"> 20</label>
+        <label><input type="checkbox" class="cycleCheck" value="30" checked> 30</label>
+        <label><input type="checkbox" class="cycleCheck" value="40"> 40</label>
+        <label><input type="checkbox" class="cycleCheck" value="50"> 50</label>
+        <label><input type="checkbox" class="cycleCheck" value="60" checked> 60</label>
         <button onclick="useCheckedCycles()">Use Checked Cycles</button>
     </div>
 
     <div class="note">
-        בכניסה לדף לא נטענים גרפים. סמן את הגרפים הרצויים ולחץ Load Selected Graphs.
+        בכניסה לדף לא נטענים גרפים. אפשר לחפש תא לפי שם או לפי Cycler / Module / Channel, ואז לסמן גרפים וללחוץ Load Selected Graphs.
     </div>
+
+    <div id="searchStatus" class="search-status"></div>
 </div>
 
 <div class="panel" id="summaryPanel" style="display:none;">
     <h2>Test Summary</h2>
     <div class="summary-grid">
-        <div class="summary-card"><div class="summary-title">Test ID</div><div class="summary-value" id="summaryTestId">-</div></div>
-        <div class="summary-card"><div class="summary-title">Cycle Count</div><div class="summary-value" id="summaryCycleCount">-</div></div>
-        <div class="summary-card"><div class="summary-title">Initial Discharge Capacity</div><div class="summary-value" id="summaryInitialCapacity">-</div></div>
-        <div class="summary-card"><div class="summary-title">Current Discharge Capacity</div><div class="summary-value" id="summaryCurrentCapacity">-</div></div>
-        <div class="summary-card"><div class="summary-title">Retention</div><div class="summary-value" id="summaryRetention">-</div></div>
-        <div class="summary-card"><div class="summary-title">Average CE</div><div class="summary-value" id="summaryAvgCe">-</div></div>
+        <div class="summary-card">
+            <div class="summary-title">Test ID</div>
+            <div class="summary-value" id="summaryTestId">-</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-title">Cycle Count</div>
+            <div class="summary-value" id="summaryCycleCount">-</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-title">Initial Discharge Capacity</div>
+            <div class="summary-value" id="summaryInitialCapacity">-</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-title">Current Discharge Capacity</div>
+            <div class="summary-value" id="summaryCurrentCapacity">-</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-title">Retention</div>
+            <div class="summary-value" id="summaryRetention">-</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-title">Average CE</div>
+            <div class="summary-value" id="summaryAvgCe">-</div>
+        </div>
     </div>
 </div>
 
@@ -294,47 +333,112 @@ button:hover {
 let latestCycleData = [];
 let latestPlotData = null;
 
-async function searchCell() {
-    const cellName = document.getElementById("cellNameSearch").value.trim();
-    const cycler = document.getElementById("cyclerInput").value.trim();
-    const module = document.getElementById("moduleInput").value.trim();
-    const channel = document.getElementById("channelInput").value.trim();
+function normalizeText(value) {
+    return String(value || "").trim().toLowerCase();
+}
 
-    const params = new URLSearchParams();
-    if (cellName) params.append("cell_name", cellName);
-    if (cycler) params.append("cycler", cycler);
-    if (module) params.append("module", module);
-    if (channel) params.append("channel", channel);
+function getTestField(test, possibleNames) {
+    for (const name of possibleNames) {
+        if (test[name] !== undefined && test[name] !== null) {
+            return test[name];
+        }
+    }
+    return "";
+}
 
-    const response = await fetch(`/tests/search?${params.toString()}`);
-    const filtered = await response.json();
+function buildTestLabel(test) {
+    const id = getTestField(test, ["id", "test_id"]);
+    const testName = getTestField(test, ["cell_name", "cellName", "test_name", "name", "filename"]);
+    const cycler = getTestField(test, ["cycler_number", "cycler", "cyclerNumber"]);
+    const module = getTestField(test, ["module_number", "module", "moduleNumber"]);
+    const channel = getTestField(test, ["channel_number", "channel", "channelNumber"]);
 
-    const selector = document.getElementById("testSelector");
-    selector.innerHTML = "";
+    let label = `ID ${id}`;
 
-    if (!filtered.length) {
-        const option = document.createElement("option");
-        option.value = "";
-        option.textContent = "No tests found";
-        selector.appendChild(option);
-        document.getElementById("testId").value = "";
-        alert("No tests found");
-        return;
+    if (testName) {
+        label += ` | ${testName}`;
     }
 
-    filtered.forEach(t => {
-        const option = document.createElement("option");
-        option.value = t.id;
-        option.textContent = `ID ${t.id} | ${t.cell_name || t.test_name || ""}`;
-        selector.appendChild(option);
-    });
+    if (cycler || module || channel) {
+        label += ` | Cycler ${cycler || "-"} / M${module || "-"} / CH${channel || "-"}`;
+    }
 
-    document.getElementById("testId").value = filtered[0].id;
+    return label;
+}
+
+function setSearchStatus(message) {
+    document.getElementById("searchStatus").textContent = message;
+}
+
+async function searchCell() {
+    const cellName = normalizeText(document.getElementById("cellNameSearch").value);
+    const cycler = normalizeText(document.getElementById("cyclerInput").value);
+    const module = normalizeText(document.getElementById("moduleInput").value);
+    const channel = normalizeText(document.getElementById("channelInput").value);
+
+    const selector = document.getElementById("testSelector");
+    selector.innerHTML = `<option value="">Searching...</option>`;
+    setSearchStatus("Searching tests...");
+
+    try {
+        const response = await fetch("/tests");
+        const tests = await response.json();
+
+        if (!Array.isArray(tests)) {
+            throw new Error("/tests did not return a list");
+        }
+
+        let matches = tests.filter(test => {
+            const id = normalizeText(getTestField(test, ["id", "test_id"]));
+            const testName = normalizeText(getTestField(test, ["cell_name", "cellName", "test_name", "name", "filename"]));
+            const testCycler = normalizeText(getTestField(test, ["cycler_number", "cycler", "cyclerNumber"]));
+            const testModule = normalizeText(getTestField(test, ["module_number", "module", "moduleNumber"]));
+            const testChannel = normalizeText(getTestField(test, ["channel_number", "channel", "channelNumber"]));
+
+            if (cellName) {
+                return testName.includes(cellName) || id === cellName;
+            }
+
+            return (
+                (!cycler || testCycler === cycler) &&
+                (!module || testModule === module) &&
+                (!channel || testChannel === channel)
+            );
+        });
+
+        selector.innerHTML = "";
+
+        if (matches.length === 0) {
+            selector.innerHTML = `<option value="">No matching tests found</option>`;
+            setSearchStatus("No matching tests found. If search by Cycler/Module/Channel does not work, the database still needs those columns.");
+            return;
+        }
+
+        matches.forEach(test => {
+            const id = getTestField(test, ["id", "test_id"]);
+            const option = document.createElement("option");
+            option.value = id;
+            option.textContent = buildTestLabel(test);
+            selector.appendChild(option);
+        });
+
+        document.getElementById("testId").value = selector.value;
+        setSearchStatus(`Found ${matches.length} matching test(s). Selected Test ID ${selector.value}.`);
+    } catch (error) {
+        selector.innerHTML = `<option value="">Search failed</option>`;
+        setSearchStatus("Search failed: " + error.message);
+        console.error(error);
+    }
 }
 
 function loadSelectedTest() {
-    const selector = document.getElementById("testSelector");
-    document.getElementById("testId").value = selector.value;
+    const selectedId = document.getElementById("testSelector").value;
+    if (!selectedId) {
+        return;
+    }
+
+    document.getElementById("testId").value = selectedId;
+    loadData();
 }
 
 function isGraphSelected(chartId) {
@@ -365,6 +469,10 @@ function showChart(chartId) {
 }
 
 function useCheckedCycles() {
+    const checked = Array.from(document.querySelectorAll(".cycleCheck:checked"))
+        .map(cb => cb.value);
+
+    document.getElementById("cycles").value = checked.join(",");
     loadData();
 }
 
@@ -443,17 +551,27 @@ function updateSummary(testId, cycleData) {
     const retention = initial && current ? (current / initial) * 100 : null;
 
     const ceValues = cycleData
-        .map(d => d.charge_capacity && d.discharge_capacity ? (d.discharge_capacity / d.charge_capacity) * 100 : null)
+        .map(d =>
+            d.charge_capacity && d.discharge_capacity
+                ? (d.discharge_capacity / d.charge_capacity) * 100
+                : null
+        )
         .filter(v => v !== null && isFinite(v));
 
-    const avgCe = ceValues.length ? ceValues.reduce((a, b) => a + b, 0) / ceValues.length : null;
+    const avgCe = ceValues.length
+        ? ceValues.reduce((a, b) => a + b, 0) / ceValues.length
+        : null;
 
     document.getElementById("summaryTestId").textContent = testId;
     document.getElementById("summaryCycleCount").textContent = cycleData.length;
-    document.getElementById("summaryInitialCapacity").textContent = initial !== null ? initial.toFixed(2) + " mAh" : "-";
-    document.getElementById("summaryCurrentCapacity").textContent = current !== null ? current.toFixed(2) + " mAh" : "-";
-    document.getElementById("summaryRetention").textContent = retention !== null ? retention.toFixed(1) + " %" : "-";
-    document.getElementById("summaryAvgCe").textContent = avgCe !== null ? avgCe.toFixed(2) + " %" : "-";
+    document.getElementById("summaryInitialCapacity").textContent =
+        initial !== null ? initial.toFixed(2) + " mAh" : "-";
+    document.getElementById("summaryCurrentCapacity").textContent =
+        current !== null ? current.toFixed(2) + " mAh" : "-";
+    document.getElementById("summaryRetention").textContent =
+        retention !== null ? retention.toFixed(1) + " %" : "-";
+    document.getElementById("summaryAvgCe").textContent =
+        avgCe !== null ? avgCe.toFixed(2) + " %" : "-";
 
     document.getElementById("summaryPanel").style.display = "block";
 }
@@ -463,11 +581,6 @@ async function loadData() {
     const limit = document.getElementById("limit").value;
     const mass = parseFloat(document.getElementById("mass").value);
     const mode = document.getElementById("mode").value;
-
-    if (!testId) {
-        alert("Select a test first");
-        return;
-    }
 
     const selectedCycles = document.getElementById("cycles").value
         .split(",")
@@ -489,6 +602,8 @@ async function loadData() {
         if (!isGraphSelected(chartId)) hideChart(chartId);
     });
 
+    const needCycles = true;
+
     const needRawPlot =
         isGraphSelected("voltageChart") ||
         isGraphSelected("currentChart");
@@ -504,21 +619,27 @@ async function loadData() {
     let plotData = null;
     let fadeData = null;
 
-    const cycleResponse = await fetch(`/test/${testId}/cycles`);
-    cycleData = await cycleResponse.json();
-    latestCycleData = cycleData;
-    updateSummary(testId, cycleData);
+    if (needCycles) {
+        const cycleResponse = await fetch(`/test/${testId}/cycles`);
+        cycleData = await cycleResponse.json();
+        latestCycleData = cycleData;
+        updateSummary(testId, cycleData);
+    }
 
     if (needRawPlot) {
         const plotResponse = await fetch(`/test/${testId}/plot?limit=${limit}`);
         plotData = await plotResponse.json();
         latestPlotData = plotData;
     }
+console.log("PLOT DATA");
+console.log(plotData);
 
     if (needVoltageFade) {
         const fadeResponse = await fetch(`/test/${testId}/voltage_fade`);
         fadeData = await fadeResponse.json();
     }
+console.log("FADE DATA");
+console.log(fadeData);
 
     if (isGraphSelected("specCapacityChart")) {
         showChart("specCapacityChart");
@@ -533,10 +654,7 @@ async function loadData() {
         ], {
             title: "Specific Capacity vs Cycle",
             xaxis: { title: "Cycle" },
-            yaxis: {
-                title: "Specific Capacity (mAh/g)",
-                rangemode: "tozero"
-            },
+            yaxis: { title: "Specific Capacity (mAh/g)" },
             template: "plotly_white"
         });
     }
@@ -545,11 +663,16 @@ async function loadData() {
         showChart("retentionChart");
 
         const cycles = cycleData.map(d => d.cycle);
-        const validDischarge = cycleData.filter(d => d.discharge_capacity !== null && d.discharge_capacity !== undefined);
+        const validDischarge = cycleData.filter(d =>
+            d.discharge_capacity !== null &&
+            d.discharge_capacity !== undefined
+        );
         const firstDischarge = validDischarge.length ? validDischarge[0].discharge_capacity : null;
 
         const retention = cycleData.map(d =>
-            firstDischarge && d.discharge_capacity ? (d.discharge_capacity / firstDischarge) * 100 : null
+            firstDischarge && d.discharge_capacity
+                ? (d.discharge_capacity / firstDischarge) * 100
+                : null
         );
 
         Plotly.newPlot("retentionChart", [
@@ -557,7 +680,7 @@ async function loadData() {
         ], {
             title: "Capacity Retention vs Cycle",
             xaxis: { title: "Cycle" },
-            yaxis: { title: "Retention (%)", rangemode: "tozero" },
+            yaxis: { title: "Retention (%)" },
             template: "plotly_white"
         });
     }
@@ -567,7 +690,9 @@ async function loadData() {
 
         const cycles = cycleData.map(d => d.cycle);
         const ce = cycleData.map(d =>
-            d.charge_capacity && d.discharge_capacity ? (d.discharge_capacity / d.charge_capacity) * 100 : null
+            d.charge_capacity && d.discharge_capacity
+                ? (d.discharge_capacity / d.charge_capacity) * 100
+                : null
         );
 
         Plotly.newPlot("ceChart", [
@@ -575,7 +700,7 @@ async function loadData() {
         ], {
             title: "Calculated Coulombic Efficiency vs Cycle",
             xaxis: { title: "Cycle" },
-            yaxis: { title: "CE (%)", rangemode: "tozero" },
+            yaxis: { title: "CE (%)" },
             template: "plotly_white"
         });
     }
@@ -594,7 +719,7 @@ async function loadData() {
         ], {
             title: "Voltage Fade",
             xaxis: { title: "Cycle" },
-            yaxis: { title: "Average Discharge Voltage (V)", rangemode: "tozero" },
+            yaxis: { title: "Average Discharge Voltage (V)" },
             template: "plotly_white"
         });
     }
@@ -673,7 +798,7 @@ async function loadData() {
             Plotly.newPlot("voltageCapacityChart", voltageCapacityTraces, {
                 title: "Voltage vs Capacity Overlay",
                 xaxis: { title: "Capacity (mAh)" },
-                yaxis: { title: "Voltage (V)", rangemode: "tozero" },
+                yaxis: { title: "Voltage (V)" },
                 template: "plotly_white",
                 hovermode: "closest",
                 legend: { orientation: "h", y: -0.25 }
@@ -689,7 +814,7 @@ async function loadData() {
         ], {
             title: "Voltage vs Time",
             xaxis: { title: "Time" },
-            yaxis: { title: "Voltage (V)", rangemode: "tozero" },
+            yaxis: { title: "Voltage (V)" },
             template: "plotly_white"
         });
     }
@@ -702,7 +827,7 @@ async function loadData() {
         ], {
             title: "Current vs Time",
             xaxis: { title: "Time" },
-            yaxis: { title: "Current (A)", rangemode: "tozero" },
+            yaxis: { title: "Current (A)" },
             template: "plotly_white"
         });
     }
