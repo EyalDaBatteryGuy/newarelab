@@ -1,0 +1,13 @@
+qc
+qc/
+
+auto_importer.py
+
+__pycache__/
+*.pyc
+
+*.sql
+*.csv
+*.ndax
+
+.env
