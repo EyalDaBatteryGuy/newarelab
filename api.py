@@ -72,7 +72,7 @@ def tests():
 @app.get("/tests/search")
 def search_tests(
     cell_name: str | None = None,
-    cycler: int | None = None,
+    cycler: str | None = None,
     module: int | None = None,
     channel: int | None = None,
 ):
@@ -107,7 +107,7 @@ def search_tests(
               AND channel_no = %s
             ORDER BY id DESC
             LIMIT 50
-        """, (cycler, module, channel))
+        """, (str(cycler), module, channel))
 
     rows = cur.fetchall()
 
