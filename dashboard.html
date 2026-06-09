@@ -222,11 +222,7 @@ button:hover {
             <input id="limit" value="1000">
         </div>
 
-        <div class="control hidden" id="massControl">
-            Active mass (g)
-            <input id="mass" value="1.3191">
-        </div>
-
+       
         <div class="control">
             Mode
             <select id="mode">
@@ -343,11 +339,7 @@ function isGraphSelected(chartId) {
 }
 
 function updateVisibleControls() {
-    document.getElementById("massControl").classList.toggle(
-        "hidden",
-        !isGraphSelected("specCapacityChart")
-    );
-
+    
     const showCyclePanel =
         isGraphSelected("dqdvChart") ||
         isGraphSelected("voltageCapacityChart");
@@ -461,7 +453,6 @@ function updateSummary(testId, cycleData) {
 async function loadData() {
     const testId = document.getElementById("testId").value;
     const limit = document.getElementById("limit").value;
-    const mass = parseFloat(document.getElementById("mass").value);
     const mode = document.getElementById("mode").value;
 
     if (!testId) {
@@ -524,8 +515,8 @@ async function loadData() {
         showChart("specCapacityChart");
 
         const cycles = cycleData.map(d => d.cycle);
-        const chargeSpec = cycleData.map(d => d.charge_capacity / mass);
-        const dischargeSpec = cycleData.map(d => d.discharge_capacity / mass);
+        const chargeSpec = cycleData.map(d => d.charge_capacity);
+const dischargeSpec = cycleData.map(d => d.discharge_capacity);
 
         Plotly.newPlot("specCapacityChart", [
             { x: cycles, y: chargeSpec, mode: "lines+markers", name: "Charge specific capacity", line: { width: 3 } },
