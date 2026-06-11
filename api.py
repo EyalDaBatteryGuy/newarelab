@@ -1,10 +1,11 @@
+from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 import psycopg2
 import os
+
 
 app = FastAPI()
 
@@ -22,17 +23,35 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 
 
 def get_conn():
-    return psycopg2.connect(DATABASE_URL)
+    if DATABASE_URL:
+        return psycopg2.connect(DATABASE_URL)
+
+    return psycopg2.connect(
+        host="localhost",
+        dbname="neware_lab",
+        user="neware",
+        password="neware123",
+    )
 
 
 @app.get("/")
 def root():
+    if os.path.exists("static/index.html"):
+        return FileResponse("static/index.html")
+    if os.path.exists("dashboard.html"):
+        return FileResponse("dashboard.html")
     return {"status": "ok"}
 
 
 @app.get("/dashboard")
 def dashboard():
-    return FileResponse("/app/dashboard.html")
+    if os.path.exists("static/index.html"):
+        return FileResponse("static/index.html")
+    if os.path.exists("static/dashboard.html"):
+        return FileResponse("static/dashboard.html")
+    if os.path.exists("dashboard.html"):
+        return FileResponse("dashboard.html")
+    return {"error": "dashboard html file not found"}
 
 
 @app.get("/tests")
@@ -42,28 +61,36 @@ def tests():
 
     cur.execute("""
         SELECT
-            id,
-            test_name,
-            device_id,
-            module_no,
-            channel_no
-        FROM tests
-        ORDER BY id DESC
+            t.id,
+            t.test_name,
+            COALESCE(c.cycle_count, 0) AS cycle_count,
+            COALESCE(r.record_count, 0) AS record_count
+        FROM tests t
+        LEFT JOIN (
+            SELECT test_id, COUNT(*) AS cycle_count
+            FROM cycles
+            GROUP BY test_id
+        ) c ON c.test_id = t.id
+        LEFT JOIN (
+            SELECT test_id, COUNT(*) AS record_count
+            FROM records
+            GROUP BY test_id
+        ) r ON r.test_id = t.id
+        WHERE COALESCE(c.cycle_count, 0) > 0
+        ORDER BY t.test_name, t.id
     """)
 
     rows = cur.fetchall()
-
     cur.close()
     conn.close()
 
     return [
         {
             "id": r[0],
-            "test_name": r[1],
+            "test_name": f"{r[1]} | Run ID {r[0]} | {r[2]} cycles | {r[3]} records",
             "cell_name": r[1],
-            "cycler_number": r[2],
-            "module_number": r[3],
-            "channel_number": r[4]
+            "cycle_count": r[2],
+            "record_count": r[3],
         }
         for r in rows
     ]
@@ -79,49 +106,59 @@ def search_tests(
     conn = get_conn()
     cur = conn.cursor()
 
-    if cell_name:
-        cur.execute("""
-            SELECT
-                id,
-                test_name,
-                device_id,
-                module_no,
-                channel_no
-            FROM tests
-            WHERE LOWER(test_name) LIKE LOWER(%s)
-            ORDER BY id DESC
-            LIMIT 50
-        """, (f"%{cell_name}%",))
+    base_sql = """
+        SELECT
+            t.id,
+            t.test_name,
+            t.device_id,
+            t.module_no,
+            t.channel_no,
+            COALESCE(c.cycle_count, 0) AS cycle_count,
+            COALESCE(r.record_count, 0) AS record_count
+        FROM tests t
+        LEFT JOIN (
+            SELECT test_id, COUNT(*) AS cycle_count
+            FROM cycles
+            GROUP BY test_id
+        ) c ON c.test_id = t.id
+        LEFT JOIN (
+            SELECT test_id, COUNT(*) AS record_count
+            FROM records
+            GROUP BY test_id
+        ) r ON r.test_id = t.id
+    """
 
+    if cell_name:
+        cur.execute(base_sql + """
+            WHERE LOWER(t.test_name) LIKE LOWER(%s)
+              AND COALESCE(c.cycle_count, 0) > 0
+            ORDER BY t.test_name, t.id
+            LIMIT 100
+        """, (f"%{cell_name}%",))
     else:
-        cur.execute("""
-            SELECT
-                id,
-                test_name,
-                device_id,
-                module_no,
-                channel_no
-            FROM tests
-            WHERE device_id = %s
-              AND module_no = %s
-              AND channel_no = %s
-            ORDER BY id DESC
-            LIMIT 50
+        cur.execute(base_sql + """
+            WHERE t.device_id = %s
+              AND t.module_no = %s
+              AND t.channel_no = %s
+              AND COALESCE(c.cycle_count, 0) > 0
+            ORDER BY t.id DESC
+            LIMIT 100
         """, (str(cycler), module, channel))
 
     rows = cur.fetchall()
-
     cur.close()
     conn.close()
 
     return [
         {
             "id": r[0],
-            "test_name": r[1],
+            "test_name": f"{r[1]} | Run ID {r[0]} | {r[5]} cycles | {r[6]} records",
             "cell_name": r[1],
             "cycler_number": r[2],
             "module_number": r[3],
-            "channel_number": r[4]
+            "channel_number": r[4],
+            "cycle_count": r[5],
+            "record_count": r[6],
         }
         for r in rows
     ]
@@ -136,14 +173,14 @@ def test_cycles(test_id: int):
         SELECT
             cycle_index,
             charge_capacity_ah,
-            discharge_capacity_ah
+            discharge_capacity_ah,
+            efficiency_percent
         FROM cycles
         WHERE test_id = %s
         ORDER BY cycle_index
     """, (test_id,))
 
     rows = cur.fetchall()
-
     cur.close()
     conn.close()
 
@@ -151,7 +188,10 @@ def test_cycles(test_id: int):
         {
             "cycle": r[0],
             "charge_capacity": r[1],
-            "discharge_capacity": r[2]
+            "discharge_capacity": r[2],
+            "charge_specific_capacity": r[1],
+            "discharge_specific_capacity": r[2],
+            "efficiency_percent": r[3],
         }
         for r in rows
     ]
@@ -169,14 +209,13 @@ def test_plot(test_id: int, limit: int = 5000):
             current_a,
             capacity_ah,
             energy_wh
-        FROM records_plain
+        FROM records
         WHERE test_id = %s
         ORDER BY time
         LIMIT %s
     """, (test_id, limit))
 
     rows = cur.fetchall()
-
     cur.close()
     conn.close()
 
@@ -199,13 +238,12 @@ def build_segments(test_id: int):
             voltage_v,
             current_a,
             capacity_ah
-        FROM records_plain
+        FROM records
         WHERE test_id = %s
         ORDER BY time
     """, (test_id,))
 
     rows = cur.fetchall()
-
     cur.close()
     conn.close()
 
@@ -216,12 +254,10 @@ def build_segments(test_id: int):
     last_sign = None
 
     for time, voltage, current, capacity in rows:
-
         if current is None or capacity is None:
             continue
 
         sign = 1 if current > 0 else -1 if current < 0 else 0
-
         new_segment = False
 
         if last_capacity is not None and capacity < last_capacity:
@@ -243,7 +279,7 @@ def build_segments(test_id: int):
             "time": str(time),
             "voltage": voltage,
             "current": current,
-            "capacity": capacity
+            "capacity": capacity,
         })
 
         last_capacity = capacity
@@ -262,14 +298,13 @@ def virtual_cycle(test_id: int, cycle_number: int):
     segments = build_segments(test_id)
 
     cycle_index = cycle_number - 1
-
     charge_i = cycle_index * 2
     discharge_i = charge_i + 1
 
     return {
         "cycle": cycle_number,
         "charge": segments[charge_i] if charge_i < len(segments) else [],
-        "discharge": segments[discharge_i] if discharge_i < len(segments) else []
+        "discharge": segments[discharge_i] if discharge_i < len(segments) else [],
     }
 
 
@@ -279,11 +314,9 @@ def voltage_fade(test_id: int):
 
     cycles = []
     avg_voltage = []
-
     cycle_number = 1
 
     for i in range(1, len(segments), 2):
-
         discharge = segments[i]
 
         voltages = [
@@ -300,5 +333,5 @@ def voltage_fade(test_id: int):
 
     return {
         "cycle": cycles,
-        "avg_voltage": avg_voltage
+        "avg_voltage": avg_voltage,
     }

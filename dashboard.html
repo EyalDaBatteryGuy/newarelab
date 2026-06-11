@@ -297,10 +297,14 @@ async function searchCell() {
     const channel = document.getElementById("channelInput").value.trim();
 
     const params = new URLSearchParams();
-    if (cellName) params.append("cell_name", cellName);
-    if (cycler) params.append("cycler", cycler);
-    if (module) params.append("module", module);
-    if (channel) params.append("channel", channel);
+
+    if (cellName) {
+        params.append("cell_name", cellName);
+    } else {
+        if (cycler) params.append("cycler", cycler);
+        if (module) params.append("module", module);
+        if (channel) params.append("channel", channel);
+    }
 
     const response = await fetch(`/tests/search?${params.toString()}`);
     const filtered = await response.json();
@@ -321,7 +325,7 @@ async function searchCell() {
     filtered.forEach(t => {
         const option = document.createElement("option");
         option.value = t.id;
-        option.textContent = `ID ${t.id} | ${t.cell_name || t.test_name || ""}`;
+        option.textContent = t.test_name;
         selector.appendChild(option);
     });
 
