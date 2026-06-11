@@ -54,8 +54,8 @@ def dashboard():
     return {"error": "dashboard html file not found"}
 
 
-@app.get("/tests/search")
-def search_tests(...):
+@app.get("/tests")
+def tests():
     conn = get_conn()
     cur = conn.cursor()
 
@@ -63,19 +63,13 @@ def search_tests(...):
         SELECT
             t.id,
             t.test_name,
-            COALESCE(c.cycle_count, 0) AS cycle_count,
-            COALESCE(r.record_count, 0) AS record_count
+            COALESCE(c.cycle_count, 0) AS cycle_count
         FROM tests t
         LEFT JOIN (
             SELECT test_id, COUNT(*) AS cycle_count
             FROM cycles
             GROUP BY test_id
         ) c ON c.test_id = t.id
-        LEFT JOIN (
-            SELECT test_id, COUNT(*) AS record_count
-            FROM records
-            GROUP BY test_id
-        ) r ON r.test_id = t.id
         WHERE COALESCE(c.cycle_count, 0) > 0
         ORDER BY t.test_name, t.id
     """)
@@ -87,10 +81,10 @@ def search_tests(...):
     return [
         {
             "id": r[0],
-            "test_name": f"{r[1]} | Run ID {r[0]} | {r[2]} cycles | {r[3]} records",
+            "test_name": f"{r[1]} | Run ID {r[0]} | {r[2]} cycles",
             "cell_name": r[1],
             "cycle_count": r[2],
-            "record_count": r[3],
+            "record_count": 0,
         }
         for r in rows
     ]
@@ -113,19 +107,13 @@ def search_tests(
             t.device_id,
             t.module_no,
             t.channel_no,
-            COALESCE(c.cycle_count, 0) AS cycle_count,
-            COALESCE(r.record_count, 0) AS record_count
+            COALESCE(c.cycle_count, 0) AS cycle_count
         FROM tests t
         LEFT JOIN (
             SELECT test_id, COUNT(*) AS cycle_count
             FROM cycles
             GROUP BY test_id
         ) c ON c.test_id = t.id
-        LEFT JOIN (
-            SELECT test_id, COUNT(*) AS record_count
-            FROM records
-            GROUP BY test_id
-        ) r ON r.test_id = t.id
     """
 
     if cell_name:
@@ -152,13 +140,13 @@ def search_tests(
     return [
         {
             "id": r[0],
-            "test_name": f"{r[1]} | Run ID {r[0]} | {r[5]} cycles | {r[6]} records",
+            "test_name": f"{r[1]} | Run ID {r[0]} | {r[5]} cycles",
             "cell_name": r[1],
             "cycler_number": r[2],
             "module_number": r[3],
             "channel_number": r[4],
             "cycle_count": r[5],
-            "record_count": r[6],
+            "record_count": 0,
         }
         for r in rows
     ]
