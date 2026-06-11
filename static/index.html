@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Neware Dashboard</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+
+<style>
+:root {
+    --bg: #f4f6f8;
+    --card: #ffffff;
+    --text: #1f2937;
+    --muted: #6b7280;
+    --border: #d1d5db;
+    --blue: #2563eb;
+    --blue-dark: #1d4ed8;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+}
+
+.header {
+    position: relative;
+    background: linear-gradient(135deg, #111827, #1e3a8a);
+    color: white;
+    padding: 28px 36px;
+    min-height: 90px;
+}
+
+.header h1 {
+    margin: 0;
+    font-size: 34px;
+    padding-right: 230px;
+}
+
+.header p {
+    margin: 8px 0 0 0;
+    color: #dbeafe;
+    padding-right: 230px;
+}
+
+.company-logo {
+    position: absolute;
+    top: 20px;
+    right: 30px;
+    height: 70px;
+    width: auto;
+    max-width: 200px;
+    object-fit: contain;
+}
+
+.container {
+    padding: 24px 36px;
+}
+
+.panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    margin-bottom: 22px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+}
+
+.controls-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    align-items: end;
+}
+
+.control {
+    display: flex;
+    flex-direction: column;
+    font-size: 14px;
+    color: var(--muted);
+}
+
+input, select {
+    padding: 9px 11px;
+    font-size: 15px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    min-width: 140px;
+}
+
+button {
+    padding: 10px 15px;
+    font-size: 15px;
+    border: none;
+    border-radius: 8px;
+    background: var(--blue);
+    color: white;
+    cursor: pointer;
+}
+
+button:hover {
+    background: var(--blue-dark);
+}
+
+.secondary {
+    background: #374151;
+}
+
+.secondary:hover {
+    background: #111827;
+}
+
+.checkbox-group {
+    margin-top: 18px;
+    line-height: 2;
+}
+
+.checkbox-group label {
+    margin-right: 16px;
+    white-space: nowrap;
+}
+
+.chart {
+    width: 100%;
+    height: 520px;
+    margin-bottom: 26px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+    display: none;
+}
+
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px;
+}
+
+.summary-card {
+    background: #f9fafb;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+}
+
+.summary-title {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 6px;
+}
+
+.summary-value {
+    font-size: 22px;
+    font-weight: bold;
+    color: var(--text);
+}
+
+.note {
+    color: var(--muted);
+    font-size: 14px;
+    margin-top: 10px;
+}
+
+.hidden {
+    display: none;
+}
+</style>
+</head>
+
+<body>
+
+<div class="header">
+    <img src="/static/salion-logo.png" class="company-logo" alt="Salion Energy">
+    <h1>Neware Battery Dashboard</h1>
+    <p>Battery cycling analysis · Specific Capacity · CE · dQ/dV · Voltage-Capacity</p>
+</div>
+
+<div class="container">
+
+<div class="panel">
+    <div class="controls-grid">
+        <div class="control">
+            Search Cell Name
+            <input id="cellNameSearch" placeholder="Cell Name">
+        </div>
+
+        <div class="control">
+            Cycler
+            <input id="cyclerInput" placeholder="122">
+        </div>
+
+        <div class="control">
+            Module
+            <input id="moduleInput" placeholder="1">
+        </div>
+
+        <div class="control">
+            Channel
+            <input id="channelInput" placeholder="1">
+        </div>
+
+        <div class="control">
+            <button onclick="searchCell()">Find Cell</button>
+        </div>
+
+        <div class="control">
+            Test List
+            <select id="testSelector" onchange="loadSelectedTest()">
+                <option value="">Select Test</option>
+            </select>
+        </div>
+
+        <div class="control">
+            Test ID
+            <input id="testId" value="1">
+        </div>
+
+        <div class="control">
+            Max Raw Data Points
+            <input id="limit" value="1000">
+        </div>
+
+       
+        <div class="control">
+            Mode
+            <select id="mode">
+                <option value="both">Charge + Discharge</option>
+                <option value="charge">Charge only</option>
+                <option value="discharge">Discharge only</option>
+            </select>
+        </div>
+
+        <button onclick="loadData()">Load Selected Graphs</button>
+        <button class="secondary" onclick="downloadVisibleData()">Download Cycle Data CSV</button>
+        <button class="secondary" onclick="downloadDqdv()">Download dQ/dV PNG</button>
+        <button class="secondary" onclick="downloadVoltageCapacity()">Download V-Capacity PNG</button>
+    </div>
+
+    <div class="checkbox-group">
+        <b>Show graphs:</b><br>
+        <label><input type="checkbox" class="graphCheck" value="specCapacityChart" onchange="updateVisibleControls()" checked> Specific Capacity</label>
+        <label><input type="checkbox" class="graphCheck" value="retentionChart" onchange="updateVisibleControls()"> Retention</label>
+        <label><input type="checkbox" class="graphCheck" value="ceChart" onchange="updateVisibleControls()"> CE</label>
+        <label><input type="checkbox" class="graphCheck" value="voltageFadeChart" onchange="updateVisibleControls()"> Voltage Fade</label>
+        <label><input type="checkbox" class="graphCheck" value="dqdvChart" onchange="updateVisibleControls()"> dQ/dV</label>
+        <label><input type="checkbox" class="graphCheck" value="voltageCapacityChart" onchange="updateVisibleControls()"> Voltage-Capacity</label>
+        <label><input type="checkbox" class="graphCheck" value="voltageChart" onchange="updateVisibleControls()"> Voltage-Time</label>
+        <label><input type="checkbox" class="graphCheck" value="currentChart" onchange="updateVisibleControls()"> Current-Time</label>
+    </div>
+
+    <div class="checkbox-group hidden" id="cycleSelectionPanel">
+        <b>Cycles for dQ/dV / Voltage-Capacity:</b><br>
+        Cycles:
+        <input id="cycles" value="1,10,30,60">
+        <br>
+        <button onclick="useCheckedCycles()">Use Checked Cycles</button>
+    </div>
+
+    <div class="note">
+        בכניסה לדף לא נטענים גרפים. סמן את הגרפים הרצויים ולחץ Load Selected Graphs.
+    </div>
+</div>
+
+<div class="panel" id="summaryPanel" style="display:none;">
+    <h2>Test Summary</h2>
+    <div class="summary-grid">
+        <div class="summary-card"><div class="summary-title">Test ID</div><div class="summary-value" id="summaryTestId">-</div></div>
+        <div class="summary-card"><div class="summary-title">Cycle Count</div><div class="summary-value" id="summaryCycleCount">-</div></div>
+        <div class="summary-card"><div class="summary-title">Initial Discharge Capacity</div><div class="summary-value" id="summaryInitialCapacity">-</div></div>
+        <div class="summary-card"><div class="summary-title">Current Discharge Capacity</div><div class="summary-value" id="summaryCurrentCapacity">-</div></div>
+        <div class="summary-card"><div class="summary-title">Retention</div><div class="summary-value" id="summaryRetention">-</div></div>
+        <div class="summary-card"><div class="summary-title">Average CE</div><div class="summary-value" id="summaryAvgCe">-</div></div>
+    </div>
+</div>
+
+<div id="specCapacityChart" class="chart"></div>
+<div id="retentionChart" class="chart"></div>
+<div id="ceChart" class="chart"></div>
+<div id="voltageFadeChart" class="chart"></div>
+<div id="dqdvChart" class="chart"></div>
+<div id="voltageCapacityChart" class="chart"></div>
+<div id="voltageChart" class="chart"></div>
+<div id="currentChart" class="chart"></div>
+
+</div>
+
+<script>
+let latestCycleData = [];
+let latestPlotData = null;
+
+async function searchCell() {
+    const cellName = document.getElementById("cellNameSearch").value.trim();
+    const cycler = document.getElementById("cyclerInput").value.trim();
+    const module = document.getElementById("moduleInput").value.trim();
+    const channel = document.getElementById("channelInput").value.trim();
+
+    const params = new URLSearchParams();
+
+    if (cellName) {
+        params.append("cell_name", cellName);
+    } else {
+        if (cycler) params.append("cycler", cycler);
+        if (module) params.append("module", module);
+        if (channel) params.append("channel", channel);
+    }
+
+    const response = await fetch(`/tests/search?${params.toString()}`);
+    const filtered = await response.json();
+
+    const selector = document.getElementById("testSelector");
+    selector.innerHTML = "";
+
+    if (!filtered.length) {
+        const option = document.createElement("option");
+        option.value = "";
+        option.textContent = "No tests found";
+        selector.appendChild(option);
+        document.getElementById("testId").value = "";
+        alert("No tests found");
+        return;
+    }
+
+    filtered.forEach(t => {
+        const option = document.createElement("option");
+        option.value = t.id;
+        option.textContent = t.test_name;
+        selector.appendChild(option);
+    });
+
+    document.getElementById("testId").value = filtered[0].id;
+}
+
+function loadSelectedTest() {
+    const selector = document.getElementById("testSelector");
+    document.getElementById("testId").value = selector.value;
+}
+
+function isGraphSelected(chartId) {
+    const checkbox = document.querySelector(`.graphCheck[value="${chartId}"]`);
+    return checkbox && checkbox.checked;
+}
+
+function updateVisibleControls() {
+    
+    const showCyclePanel =
+        isGraphSelected("dqdvChart") ||
+        isGraphSelected("voltageCapacityChart");
+
+    document.getElementById("cycleSelectionPanel").classList.toggle("hidden", !showCyclePanel);
+}
+
+function hideChart(chartId) {
+    Plotly.purge(chartId);
+    document.getElementById(chartId).style.display = "none";
+}
+
+function showChart(chartId) {
+    document.getElementById(chartId).style.display = "block";
+}
+
+function useCheckedCycles() {
+    loadData();
+}
+
+function movingAverage(values, windowSize) {
+    let smoothed = [];
+
+    for (let i = 0; i < values.length; i++) {
+        const start = Math.max(0, i - windowSize);
+        const end = Math.min(values.length, i + windowSize + 1);
+        const slice = values.slice(start, end);
+        const avg = slice.reduce((a, b) => a + b, 0) / slice.length;
+        smoothed.push(avg);
+    }
+
+    return smoothed;
+}
+
+function downloadChart(chartId, filename) {
+    const chart = document.getElementById(chartId);
+    if (!chart || chart.style.display === "none") {
+        alert("Graph is not visible");
+        return;
+    }
+
+    Plotly.downloadImage(chart, {
+        format: "png",
+        filename: filename,
+        width: 1800,
+        height: 1000
+    });
+}
+
+function downloadDqdv() {
+    downloadChart("dqdvChart", "dQdV_overlay");
+}
+
+function downloadVoltageCapacity() {
+    downloadChart("voltageCapacityChart", "Voltage_vs_Capacity");
+}
+
+function downloadVisibleData() {
+    if (!latestCycleData.length) {
+        alert("Load cycle data first");
+        return;
+    }
+
+    let csv = "cycle,charge_capacity,discharge_capacity,calculated_ce_percent\n";
+
+    latestCycleData.forEach(d => {
+        const ce = d.charge_capacity && d.discharge_capacity
+            ? (d.discharge_capacity / d.charge_capacity) * 100
+            : "";
+        csv += `${d.cycle},${d.charge_capacity},${d.discharge_capacity},${ce}\n`;
+    });
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "neware_cycle_data.csv";
+    link.click();
+}
+
+function updateSummary(testId, cycleData) {
+    if (!cycleData || cycleData.length === 0) {
+        document.getElementById("summaryPanel").style.display = "none";
+        return;
+    }
+
+    const validDischarge = cycleData.filter(d =>
+        d.discharge_capacity !== null &&
+        d.discharge_capacity !== undefined
+    );
+
+    const initial = validDischarge.length ? validDischarge[0].discharge_capacity : null;
+    const current = validDischarge.length ? validDischarge[validDischarge.length - 1].discharge_capacity : null;
+    const retention = initial && current ? (current / initial) * 100 : null;
+
+    const ceValues = cycleData
+        .map(d => d.charge_capacity && d.discharge_capacity ? (d.discharge_capacity / d.charge_capacity) * 100 : null)
+        .filter(v => v !== null && isFinite(v));
+
+    const avgCe = ceValues.length ? ceValues.reduce((a, b) => a + b, 0) / ceValues.length : null;
+
+    document.getElementById("summaryTestId").textContent = testId;
+    document.getElementById("summaryCycleCount").textContent = cycleData.length;
+    document.getElementById("summaryInitialCapacity").textContent = initial !== null ? initial.toFixed(2) + " mAh" : "-";
+    document.getElementById("summaryCurrentCapacity").textContent = current !== null ? current.toFixed(2) + " mAh" : "-";
+    document.getElementById("summaryRetention").textContent = retention !== null ? retention.toFixed(1) + " %" : "-";
+    document.getElementById("summaryAvgCe").textContent = avgCe !== null ? avgCe.toFixed(2) + " %" : "-";
+
+    document.getElementById("summaryPanel").style.display = "block";
+}
+
+async function loadData() {
+    const testId = document.getElementById("testId").value;
+    const limit = document.getElementById("limit").value;
+    const mode = document.getElementById("mode").value;
+
+    if (!testId) {
+        alert("Select a test first");
+        return;
+    }
+
+    const selectedCycles = document.getElementById("cycles").value
+        .split(",")
+        .map(x => parseInt(x.trim()))
+        .filter(x => !isNaN(x));
+
+    const allCharts = [
+        "specCapacityChart",
+        "retentionChart",
+        "ceChart",
+        "voltageFadeChart",
+        "dqdvChart",
+        "voltageCapacityChart",
+        "voltageChart",
+        "currentChart"
+    ];
+
+    allCharts.forEach(chartId => {
+        if (!isGraphSelected(chartId)) hideChart(chartId);
+    });
+
+    const needRawPlot =
+        isGraphSelected("voltageChart") ||
+        isGraphSelected("currentChart");
+
+    const needVirtualCycles =
+        isGraphSelected("dqdvChart") ||
+        isGraphSelected("voltageCapacityChart");
+
+    const needVoltageFade =
+        isGraphSelected("voltageFadeChart");
+
+    let cycleData = [];
+    let plotData = null;
+    let fadeData = null;
+
+    const cycleResponse = await fetch(`/test/${testId}/cycles`);
+    cycleData = await cycleResponse.json();
+    latestCycleData = cycleData;
+    updateSummary(testId, cycleData);
+
+    if (needRawPlot) {
+        const plotResponse = await fetch(`/test/${testId}/plot?limit=${limit}`);
+        plotData = await plotResponse.json();
+        latestPlotData = plotData;
+    }
+
+    if (needVoltageFade) {
+        const fadeResponse = await fetch(`/test/${testId}/voltage_fade`);
+        fadeData = await fadeResponse.json();
+    }
+
+    if (isGraphSelected("specCapacityChart")) {
+        showChart("specCapacityChart");
+
+        const cycles = cycleData.map(d => d.cycle);
+        const chargeSpec = cycleData.map(d => d.charge_capacity);
+const dischargeSpec = cycleData.map(d => d.discharge_capacity);
+
+        Plotly.newPlot("specCapacityChart", [
+            { x: cycles, y: chargeSpec, mode: "lines+markers", name: "Charge specific capacity", line: { width: 3 } },
+            { x: cycles, y: dischargeSpec, mode: "lines+markers", name: "Discharge specific capacity", line: { width: 3 } }
+        ], {
+            title: "Specific Capacity vs Cycle",
+            xaxis: { title: "Cycle" },
+            yaxis: {
+                title: "Specific Capacity (mAh/g)",
+                rangemode: "tozero"
+            },
+            template: "plotly_white"
+        });
+    }
+
+    if (isGraphSelected("retentionChart")) {
+        showChart("retentionChart");
+
+        const cycles = cycleData.map(d => d.cycle);
+        const validDischarge = cycleData.filter(d => d.discharge_capacity !== null && d.discharge_capacity !== undefined);
+        const firstDischarge = validDischarge.length ? validDischarge[0].discharge_capacity : null;
+
+        const retention = cycleData.map(d =>
+            firstDischarge && d.discharge_capacity ? (d.discharge_capacity / firstDischarge) * 100 : null
+        );
+
+        Plotly.newPlot("retentionChart", [
+            { x: cycles, y: retention, mode: "lines+markers", name: "Capacity Retention", line: { width: 3 } }
+        ], {
+            title: "Capacity Retention vs Cycle",
+            xaxis: { title: "Cycle" },
+            yaxis: { title: "Retention (%)", rangemode: "tozero" },
+            template: "plotly_white"
+        });
+    }
+
+    if (isGraphSelected("ceChart")) {
+        showChart("ceChart");
+
+        const cycles = cycleData.map(d => d.cycle);
+        const ce = cycleData.map(d =>
+            d.charge_capacity && d.discharge_capacity ? (d.discharge_capacity / d.charge_capacity) * 100 : null
+        );
+
+        Plotly.newPlot("ceChart", [
+            { x: cycles, y: ce, mode: "lines+markers", name: "Calculated CE", line: { width: 3 } }
+        ], {
+            title: "Calculated Coulombic Efficiency vs Cycle",
+            xaxis: { title: "Cycle" },
+            yaxis: { title: "CE (%)", rangemode: "tozero" },
+            template: "plotly_white"
+        });
+    }
+
+    if (isGraphSelected("voltageFadeChart")) {
+        showChart("voltageFadeChart");
+
+        Plotly.newPlot("voltageFadeChart", [
+            {
+                x: fadeData.cycle,
+                y: fadeData.avg_voltage,
+                mode: "lines+markers",
+                name: "Average Discharge Voltage",
+                line: { width: 3 }
+            }
+        ], {
+            title: "Voltage Fade",
+            xaxis: { title: "Cycle" },
+            yaxis: { title: "Average Discharge Voltage (V)", rangemode: "tozero" },
+            template: "plotly_white"
+        });
+    }
+
+    if (needVirtualCycles) {
+        let dqdvTraces = [];
+        let voltageCapacityTraces = [];
+
+        for (const cycle of selectedCycles) {
+            const response = await fetch(`/test/${testId}/virtual_cycle/${cycle}`);
+            const data = await response.json();
+
+            let parts = [];
+
+            if (mode === "charge" || mode === "both") {
+                parts.push({ name: `Cycle ${cycle} Charge`, data: data.charge });
+            }
+
+            if (mode === "discharge" || mode === "both") {
+                parts.push({ name: `Cycle ${cycle} Discharge`, data: data.discharge });
+            }
+
+            for (const part of parts) {
+                const voltage = part.data.map(d => d.voltage);
+                const capacity = part.data.map(d => d.capacity);
+
+                voltageCapacityTraces.push({
+                    x: capacity,
+                    y: voltage,
+                    mode: "lines",
+                    name: part.name,
+                    line: { width: 3 }
+                });
+
+                let rawX = [];
+                let rawY = [];
+
+                for (let i = 1; i < voltage.length; i++) {
+                    const dQ = capacity[i] - capacity[i - 1];
+                    const dV = voltage[i] - voltage[i - 1];
+
+                    if (Math.abs(dV) > 0.002 && Math.abs(dQ) < 20) {
+                        rawX.push(voltage[i]);
+                        rawY.push(dQ / dV);
+                    }
+                }
+
+                const dqdvY = movingAverage(rawY, 12);
+
+                dqdvTraces.push({
+                    x: rawX,
+                    y: dqdvY,
+                    mode: "lines",
+                    name: part.name,
+                    line: { width: 3, shape: "spline", smoothing: 1.2 }
+                });
+            }
+        }
+
+        if (isGraphSelected("dqdvChart")) {
+            showChart("dqdvChart");
+
+            Plotly.newPlot("dqdvChart", dqdvTraces, {
+                title: "dQ/dV Overlay",
+                xaxis: { title: "Voltage (V)", showgrid: true, zeroline: true },
+                yaxis: { title: "dQ/dV (mAh/V)", showgrid: true, zeroline: true },
+                template: "plotly_white",
+                hovermode: "closest",
+                legend: { orientation: "h", y: -0.25 }
+            });
+        }
+
+        if (isGraphSelected("voltageCapacityChart")) {
+            showChart("voltageCapacityChart");
+
+            Plotly.newPlot("voltageCapacityChart", voltageCapacityTraces, {
+                title: "Voltage vs Capacity Overlay",
+                xaxis: { title: "Capacity (mAh)" },
+                yaxis: { title: "Voltage (V)", rangemode: "tozero" },
+                template: "plotly_white",
+                hovermode: "closest",
+                legend: { orientation: "h", y: -0.25 }
+            });
+        }
+    }
+
+    if (isGraphSelected("voltageChart")) {
+        showChart("voltageChart");
+
+        Plotly.newPlot("voltageChart", [
+            { x: plotData.time, y: plotData.voltage, mode: "lines", name: "Voltage", line: { width: 2 } }
+        ], {
+            title: "Voltage vs Time",
+            xaxis: { title: "Time" },
+            yaxis: { title: "Voltage (V)", rangemode: "tozero" },
+            template: "plotly_white"
+        });
+    }
+
+    if (isGraphSelected("currentChart")) {
+        showChart("currentChart");
+
+        Plotly.newPlot("currentChart", [
+            { x: plotData.time, y: plotData.current, mode: "lines", name: "Current", line: { width: 2 } }
+        ], {
+            title: "Current vs Time",
+            xaxis: { title: "Time" },
+            yaxis: { title: "Current (A)", rangemode: "tozero" },
+            template: "plotly_white"
+        });
+    }
+}
+
+updateVisibleControls();
+</script>
+
+</body>
+</html>
