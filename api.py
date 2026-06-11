@@ -54,8 +54,8 @@ def dashboard():
     return {"error": "dashboard html file not found"}
 
 
-@app.get("/tests")
-def tests():
+@app.get("/tests/search")
+def search_tests(...):
     conn = get_conn()
     cur = conn.cursor()
 
